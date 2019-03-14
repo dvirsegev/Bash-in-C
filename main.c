@@ -1,3 +1,6 @@
+/// dvir segev
+/// 318651627
+
 #include <sys/types.h>
 #include <unistd.h>
 #include <stdlib.h>
@@ -48,11 +51,15 @@ char **removeSign(char **oldArray) {
     free(oldArray);
     return oldArray;
 }
-
+/**
+ * the cd function!
+ * @param pth the orders.
+ * @return 1
+ */
 int cd(char **pth) {
     if (pth[1] == NULL) {
-        fprintf(stderr, "lsh: expected argument to \"cd\"\n");
-    } else {
+       pth[1] = "/home/dvir";
+        // call cd .
         if (chdir(pth[1]) != 0) {
             perror("lsh");
         }
@@ -67,13 +74,14 @@ int cd(char **pth) {
  */
 int Bash_Execute_Program(char **args, int exSign) {
     int stat;
-    pid_t pid = getpid();
+    //pid_t pid = getpid();
     // if there is "&"
     if (exSign) {
         args = removeSign(args);
     }
     // create child
     if (fork() == 0) {
+        printf("%ld \n", (long) getpid());
         // check if the code is reasonable.
         int success = execvp(args[0], args);
         if (success < 0) { fprintf(stderr, "Error in system call"); }
@@ -82,7 +90,7 @@ int Bash_Execute_Program(char **args, int exSign) {
         // if there is "&", wait for child to finish
         if (exSign == 0) { wait(&stat); }
         else {
-            printf("%ld \n", (long) getpid());
+            printf("%ld \n", (long) getppid());
         }
         return 1;
     }
@@ -102,7 +110,10 @@ int Bash_getSign(char **args) {
     }
     return 0;
 }
-
+/**
+ * @param args the input
+ * @return 1 if the order is built int or not
+ */
 int check_builtin(char **args) {
     if (strcmp(args[0], "cd") == 0 || strcmp(args[0], "exit") == 0)
         return 1;
@@ -112,9 +123,14 @@ int check_builtin(char **args) {
 }
 
 int Bash_Execute_BuiltProgram(char **args) {
-
+    int i=0;
     if (strcmp(args[0], "cd") == 0)
         return cd(args);
+    else if (strcmp(args[0], "exit") == 0)
+         exit(0);
+    else
+        printf("Error\n");
+    return -1;
 }
 
 int main() {
@@ -130,9 +146,11 @@ int main() {
         // check if there is sign "&".
         exSign = Bash_getSign(args);
         // if the order is built in
-        if (check_builtin(args))
+        if (check_builtin(args)) {
+            printf("%ld \n", (long) getpid());
             //execute the line.
             okay = Bash_Execute_BuiltProgram(args);
+        }
         else
             // execute the line. (the order isn't buildup).
             okay = Bash_Execute_Program(args, exSign);
