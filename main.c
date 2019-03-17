@@ -10,7 +10,9 @@
 
 #define LSH_TOK_DELIM " \t\r\n\a"
 #define BUFFERSIZE 512
-
+/**
+ * getLIne from user
+ */
 char *Bash_Get_Line(void) {
     char *line = NULL;
     ssize_t bufsize = 0;
@@ -18,7 +20,10 @@ char *Bash_Get_Line(void) {
     getline(&line, &bufsize, stdin);
     return line;
 }
-
+/**
+ * split the line by strtok
+ * return the line
+ */
 char **Bash_Split_Line(char *line) {
     int bufsize = BUFFERSIZE, position = 0;
     char **theLine = malloc(bufsize * sizeof(char *));
@@ -38,7 +43,10 @@ char **Bash_Split_Line(char *line) {
     theLine[position] = NULL;
     return theLine;
 }
-
+/**
+ * @param oldArray the input from user
+ * @return remove the & if there is.
+ */
 char **removeSign(char **oldArray) {
     char **newargs;
     int place = 0;
@@ -121,9 +129,11 @@ int check_builtin(char **args) {
 
 
 }
-
+/**
+ * @param args input from user.
+ * @return execute the command
+ */
 int Bash_Execute_BuiltProgram(char **args) {
-    int i=0;
     if (strcmp(args[0], "cd") == 0)
         return cd(args);
     else if (strcmp(args[0], "exit") == 0)
