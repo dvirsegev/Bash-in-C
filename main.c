@@ -10,6 +10,16 @@
 
 #define LSH_TOK_DELIM " \t\r\n\a"
 #define BUFFERSIZE 512
+
+struct jobs {
+    char array[BUFFERSIZE];
+};
+
+// count how many jobs we have in our "Jobs List"
+static int count = 0;
+void AddMission(char *pString, struct jobs pJobs[512]);
+
+typedef struct jobs jobs;
 /**
  * getLIne from user
  */
@@ -43,22 +53,7 @@ char **Bash_Split_Line(char *line) {
     theLine[position] = NULL;
     return theLine;
 }
-/**
- * @param oldArray the input from user
- * @return remove the & if there is.
- */
-char **removeSign(char **oldArray) {
-    char **newargs;
-    int place = 0;
-    newargs = (char **) malloc(sizeof(oldArray));
-    while (strcmp(oldArray[place], "&") != 0) {
-        newargs[place] = oldArray[place];
-        place++;
-    }
-    oldArray = newargs;
-    free(oldArray);
-    return oldArray;
-}
+
 /**
  * the cd function!
  * @param pth the orders.
@@ -74,36 +69,86 @@ int cd(char **pth) {
     }
     return 1;
 }
-
+/**
+ * @param oldArray
+ * @return new Array without &
+ */
+char **removeSign(char **oldArray) {
+    char **newargs;
+    int place = 0;
+    newargs = (char **) malloc(sizeof(oldArray));
+    while (strcmp(oldArray[place], "&") != 0) {
+        newargs[place] = oldArray[place];
+        place++;
+    }
+    return newargs;
+}
+/**
+ * @param missions print all the missions
+ */
+void PrintJobs(jobs missions[BUFFERSIZE] ) {
+    int i =0;
+    for(i =0; i<count; i ++) {
+        printf("%s\n",missions[i].array);
+    }
+}
 /**
  * @param args the line
  * @param exSign 1 if there is & and 0 if there isn't.
  * @return the execute line and return 1.
  */
-int Bash_Execute_Program(char **args, int exSign) {
+int Bash_Execute_Program(char **args, int exSign, jobs missions[BUFFERSIZE]) {
     int stat;
-    //pid_t pid = getpid();
-    // if there is "&"
     if (exSign) {
         args = removeSign(args);
     }
+    if(strcmp(*args,"jobs") == 0 ) {
+        PrintJobs(missions);
+        return 1;
+    }
     // create child
     if (fork() == 0) {
-        printf("%ld \n", (long) getpid());
+        int success = 0;
         // check if the code is reasonable.
-        int success = execvp(args[0], args);
-        if (success < 0) { fprintf(stderr, "Error in system call"); }
+        if(!exSign)
+            success = execvp(args[0], args);
+        if (success < 0) {
+            fprintf(stderr, "Error in system call\n");
+        }
         // the parent code
     } else {
-        // if there is "&", wait for child to finish
-        if (exSign == 0) { wait(&stat); }
+        // if there isn't "&", wait for child to finish
+        if (exSign == 0) {
+            printf("%ld \n", (long) getpid());
+            wait(&stat);
+        }
         else {
             printf("%ld \n", (long) getppid());
+            char name[BUFFERSIZE];
+            sprintf(name, "%d", getppid());
+            strcat(strcat(name," "),*args);
+            AddMission(name,missions);
+            count++;
         }
         return 1;
     }
 }
 
+/**
+ * @param args the mission
+ * @param pJobs add mission to the list of jobs
+ */
+void AddMission(char *args,jobs pJobs[BUFFERSIZE]) {
+    strcpy(pJobs[count].array, args);
+    int place = 0;
+    while(pJobs->array[place] != '\0') {
+        place++;
+    }
+    pJobs[count].array[place] = ' ';
+    pJobs[count].array[++place] = '&';
+}
+
+void RemoveMissions(char *)
 /**
  * @param args the input order.
  * @return 1 if there is & in there and 0 if doesn't.
@@ -142,11 +187,11 @@ int Bash_Execute_BuiltProgram(char **args) {
         printf("Error\n");
     return -1;
 }
-
 int main() {
     char *line;
     char **args;
     int exSign, okay = 1;
+    jobs mission[BUFFERSIZE];
     while (okay) {
         printf("> ");
         // get line from the user
@@ -163,7 +208,7 @@ int main() {
         }
         else
             // execute the line. (the order isn't buildup).
-            okay = Bash_Execute_Program(args, exSign);
+            okay = Bash_Execute_Program(args, exSign,mission);
         free(line);
         free(args);
     }
