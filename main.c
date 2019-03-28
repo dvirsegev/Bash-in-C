@@ -13,13 +13,13 @@
 
 struct jobs {
     char array[BUFFERSIZE];
+    pid_t pid;
 };
-
+typedef struct jobs jobs;
 // count how many jobs we have in our "Jobs List"
 static int count = 0;
-void AddMission(char *pString, struct jobs pJobs[512]);
+void AddMission(char *args, jobs pJobs[512], pid_t pid);
 
-typedef struct jobs jobs;
 /**
  * getLIne from user
  */
@@ -89,57 +89,107 @@ char **removeSign(char **oldArray) {
 void PrintJobs(jobs missions[BUFFERSIZE] ) {
     int i =0;
     for(i =0; i<count; i ++) {
+        jobs mission = missions[i];
         printf("%s\n",missions[i].array);
     }
 }
+
+/**
+ * Remove command with the given pid from jobs array
+ * @param pid running process pid
+ */
+void DeleteJobs(pid_t pid,jobs pJobs[BUFFERSIZE]) {
+    unsigned int location = 0;
+    unsigned int i = 0;
+    for (; i < count; ++i) {
+        if (pid == pJobs[i].pid) break;
+        ++location;
+    }
+    for (; location < count; ++location)
+        pJobs[location] = pJobs[location + 1];
+    if (count)--count;
+}
+
+/**
+ * @param args the input
+ * @return 1 if the order is built int or not
+ */
+int check_builtin(char **args) {
+    if (strcmp(args[0], "cd") == 0 || strcmp(args[0], "exit") == 0 ||
+            strcmp(args[0], "jobs") == 0)
+        return 1;
+    return 0;
+
+
+}
+
+/**
+ * @param args input from user.
+ * @return execute the command
+ */
+int Bash_Execute_BuiltProgram(char **args, jobs missions[BUFFERSIZE]) {
+    if (strcmp(args[0], "cd") == 0) {
+        printf("%ld \n", (long) getpid());
+        return cd(args);
+    }
+    else if (strcmp(args[0], "exit") == 0)
+         exit(0);
+    else if (strcmp(args[0],"jobs") == 0 ) {
+            PrintJobs(missions);
+        }
+    return 1;
+}
+
 /**
  * @param args the line
  * @param exSign 1 if there is & and 0 if there isn't.
  * @return the execute line and return 1.
  */
 int Bash_Execute_Program(char **args, int exSign, jobs missions[BUFFERSIZE]) {
-    int stat;
+    pid_t  pid;
+    while ((pid = waitpid(-1, NULL, WNOHANG)) > 0) DeleteJobs(pid,missions);
     if (exSign) {
         args = removeSign(args);
     }
-    if(strcmp(*args,"jobs") == 0 ) {
-        PrintJobs(missions);
-        return 1;
+    if (check_builtin(args)) {
+        //execute the line.
+        return Bash_Execute_BuiltProgram(args,missions);
     }
     // create child
-    if (fork() == 0) {
+    if ((pid =fork()) == 0) {
         int success = 0;
         // check if the code is reasonable.
-        if(!exSign)
-            success = execvp(args[0], args);
+        success = execvp(args[0], args);
         if (success < 0) {
             fprintf(stderr, "Error in system call\n");
+            return 1;
         }
         // the parent code
-    } else {
+    }
         // if there isn't "&", wait for child to finish
         if (exSign == 0) {
-            printf("%ld \n", (long) getpid());
-            wait(&stat);
+            printf("%ld \n", (long) pid);
+            waitpid(pid,NULL, WCONTINUED);
         }
         else {
-            printf("%ld \n", (long) getppid());
+            printf("%ld \n", (long) pid);
             char name[BUFFERSIZE];
-            sprintf(name, "%d", getppid());
+            sprintf(name, "%d", pid);
             strcat(strcat(name," "),*args);
-            AddMission(name,missions);
+            AddMission(name, missions, pid);
             count++;
         }
         return 1;
     }
-}
+
 
 /**
  * @param args the mission
  * @param pJobs add mission to the list of jobs
  */
-void AddMission(char *args,jobs pJobs[BUFFERSIZE]) {
+void AddMission(char *args, jobs pJobs[512], pid_t pid) {
     strcpy(pJobs[count].array, args);
+    pJobs->pid= pid;
     int place = 0;
     while(pJobs->array[place] != '\0') {
         place++;
@@ -147,8 +197,6 @@ void AddMission(char *args,jobs pJobs[BUFFERSIZE]) {
     pJobs[count].array[place] = ' ';
     pJobs[count].array[++place] = '&';
 }
-
-void RemoveMissions(char *)
 /**
  * @param args the input order.
  * @return 1 if there is & in there and 0 if doesn't.
@@ -163,30 +211,7 @@ int Bash_getSign(char **args) {
     }
     return 0;
 }
-/**
- * @param args the input
- * @return 1 if the order is built int or not
- */
-int check_builtin(char **args) {
-    if (strcmp(args[0], "cd") == 0 || strcmp(args[0], "exit") == 0)
-        return 1;
-    return 0;
 
-
-}
-/**
- * @param args input from user.
- * @return execute the command
- */
-int Bash_Execute_BuiltProgram(char **args) {
-    if (strcmp(args[0], "cd") == 0)
-        return cd(args);
-    else if (strcmp(args[0], "exit") == 0)
-         exit(0);
-    else
-        printf("Error\n");
-    return -1;
-}
 int main() {
     char *line;
     char **args;
@@ -201,12 +226,6 @@ int main() {
         // check if there is sign "&".
         exSign = Bash_getSign(args);
         // if the order is built in
-        if (check_builtin(args)) {
-            printf("%ld \n", (long) getpid());
-            //execute the line.
-            okay = Bash_Execute_BuiltProgram(args);
-        }
-        else
             // execute the line. (the order isn't buildup).
             okay = Bash_Execute_Program(args, exSign,mission);
         free(line);
